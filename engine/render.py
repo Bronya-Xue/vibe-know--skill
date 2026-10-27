@@ -15,7 +15,7 @@
 工程目录里只需要 index.html + film.js。引擎（vk.js、vk-kit.js、fonts/）留在本文件所在目录，
 由内置的小服务器挂到 /engine/ 下 —— 不用往每个工程里拷 40MB 字体，也没有 file:// 的跨目录字体限制。
 """
-import functools, hashlib, http.server, io, json, random, subprocess, sys, threading
+import functools, hashlib, http.server, io, json, os, random, shutil, subprocess, sys, threading
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent
@@ -41,7 +41,11 @@ def serve(proj, port=0):
 
 def open_page(p, url):
     # 关掉 LCD 次像素抗锯齿（跳着 seek 字边不抖）；每帧等合成器跑完再截；固定 sRGB
-    b = p.chromium.launch(channel="chrome", args=["--disable-lcd-text", "--run-all-compositor-stages-before-draw", "--force-color-profile=srgb"])
+    executable = os.environ.get("VK_BROWSER_EXECUTABLE") or next(
+        (path for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser")
+         if (path := shutil.which(name))), None)
+    options = {"executable_path": executable} if executable else {}
+    b = p.chromium.launch(**options, args=["--disable-lcd-text", "--run-all-compositor-stages-before-draw", "--force-color-profile=srgb"])
     pg = b.new_page(viewport={"width": 1920, "height": 1080}, device_scale_factor=1)
     pg.on("console", lambda m: m.type in ("error", "warning") and print("[page]", m.text))
     pg.on("pageerror", lambda e: print("[pageerror]", e))
